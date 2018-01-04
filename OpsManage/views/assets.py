@@ -1,16 +1,16 @@
 #!/usr/bin/env python  
 # _#_ coding:utf-8 _*_  
-import os,xlrd,json
+import os,xlrd,time
 from django.http import JsonResponse
-from django.shortcuts import render_to_response,HttpResponseRedirect
-from django.template import RequestContext
+from django.shortcuts import render,HttpResponseRedirect
 from django.contrib.auth.decorators import login_required
 from OpsManage.models import *
 from django.db.models import Count
 from OpsManage.utils.ansible_api_v2 import ANSRunner
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group,User
 from OpsManage.tasks import recordAssets
 from django.contrib.auth.decorators import permission_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 def getBaseAssets():
     try:
@@ -39,39 +39,44 @@ def getBaseAssets():
 @login_required(login_url='/login')
 @permission_required('OpsManage.can_read_assets',login_url='/noperm/') 
 def assets_config(request):
-    return render_to_response('assets/assets_config.html',{"user":request.user,"baseAssets":getBaseAssets()},
-                              context_instance=RequestContext(request))
+    
+    return render(request,'assets/assets_config.html',{"user":request.user,"baseAssets":getBaseAssets()},
+                              )
     
 @login_required(login_url='/login')
 @permission_required('OpsManage.can_add_assets',login_url='/noperm/') 
 def assets_add(request):
     if request.method == "GET":
-        return render_to_response('assets/assets_add.html',{"user":request.user,"baseAssets":getBaseAssets()},
-                                  context_instance=RequestContext(request))      
+        userList = User.objects.all()
+        return render(request,'assets/assets_add.html',{"user":request.user,"baseAssets":getBaseAssets(),
+                                                        'userList':userList})      
     
 @login_required(login_url='/login')
 @permission_required('OpsManage.can_read_assets',login_url='/noperm/') 
 def assets_list(request):
+    userList = User.objects.all()
     assetsList = Assets.objects.all().order_by("-id") 
     assetOnline = Assets.objects.filter(status=0).count()
     assetOffline = Assets.objects.filter(status=1).count()
     assetMaintain = Assets.objects.filter(status=2).count()
     assetsNumber = Assets.objects.values('assets_type').annotate(dcount=Count('assets_type'))
-    return render_to_response('assets/assets_list.html',{"user":request.user,"totalAssets":assetsList.count(),
+    return render(request,'assets/assets_list.html',{"user":request.user,"totalAssets":assetsList.count(),
                                                          "assetOnline":assetOnline,"assetOffline":assetOffline,
                                                          "assetMaintain":assetMaintain,"baseAssets":getBaseAssets(),
-                                                         "assetsList":assetsList,"assetsNumber":assetsNumber},
-                              context_instance=RequestContext(request))
+                                                         "assetsList":assetsList,"assetsNumber":assetsNumber,
+                                                         'userList':userList},
+                              )
 
 @login_required(login_url='/login')
 @permission_required('OpsManage.can_read_assets',login_url='/noperm/') 
 def assets_view(request,aid): 
     try:
         assets = Assets.objects.get(id=aid)
+        userList = User.objects.all()
     except:
-        return render_to_response('404.html',{"user":request.user},
-                                context_instance=RequestContext(request))  
-    if assets.assets_type == 'server':
+        return render(request,'404.html',{"user":request.user},
+                                )  
+    if assets.assets_type in ['server','vmser']:
         try:
             asset_ram = assets.ram_assets_set.all()
         except:
@@ -83,33 +88,34 @@ def assets_view(request,aid):
         try:
             asset_body = assets.server_assets                    
         except:
-            return render_to_response('assets/assets_view.html',{"user":request.user},
-                            context_instance=RequestContext(request)) 
-        return render_to_response('assets/assets_view.html',{"user":request.user,"asset_type":assets.assets_type,
+            return render(request,'assets/assets_view.html',{"user":request.user},
+                            ) 
+        return render(request,'assets/assets_view.html',{"user":request.user,"asset_type":assets.assets_type,
                                                             "asset_main":assets,"asset_body":asset_body,
                                                             "asset_ram":asset_ram,"asset_disk":asset_disk,
-                                                            "baseAssets":getBaseAssets()},
-                            context_instance=RequestContext(request))   
+                                                            "baseAssets":getBaseAssets(),'userList':userList},
+                            )   
     else:
         try:
             asset_body = assets.network_assets
         except:
-            return render_to_response('assets/assets_view.html',{"user":request.user},
-                            context_instance=RequestContext(request))                 
-        return render_to_response('assets/assets_view.html',{"user":request.user,"asset_type":assets.assets_type,
+            return render(request,'assets/assets_view.html',{"user":request.user},
+                            )                 
+        return render(request,'assets/assets_view.html',{"user":request.user,"asset_type":assets.assets_type,
                                                             "asset_main":assets,"asset_body":asset_body,
-                                                            "baseAssets":getBaseAssets()},
-                            context_instance=RequestContext(request))  
+                                                            "baseAssets":getBaseAssets(),'userList':userList},
+                            )  
              
 @login_required(login_url='/login')
 @permission_required('OpsManage.can_change_assets',login_url='/noperm/') 
 def assets_modf(request,aid):  
     try:
         assets = Assets.objects.get(id=aid)
+        userList = User.objects.all()
     except:
-        return render_to_response('assets/assets_modf.html',{"user":request.user},
-                                context_instance=RequestContext(request))  
-    if assets.assets_type == 'server':
+        return render(request,'assets/assets_modf.html',{"user":request.user},
+                                )  
+    if assets.assets_type in ['server','vmser']:
         try:
             asset_ram = assets.ram_assets_set.all()
         except:
@@ -121,23 +127,23 @@ def assets_modf(request,aid):
         try:
             asset_body = assets.server_assets                    
         except:
-            return render_to_response('404.html',{"user":request.user},
-                            context_instance=RequestContext(request))         
-        return render_to_response('assets/assets_modf.html',{"user":request.user,"asset_type":assets.assets_type,
+            return render(request,'404.html',{"user":request.user},
+                            )         
+        return render(request,'assets/assets_modf.html',{"user":request.user,"asset_type":assets.assets_type,
                                                             "asset_main":assets,"asset_body":asset_body,
                                                             "asset_ram":asset_ram,"asset_disk":asset_disk,
-                                                            "assets_data":getBaseAssets()},
-                            context_instance=RequestContext(request))    
+                                                            "assets_data":getBaseAssets(),'userList':userList},
+                            )    
     else:     
         try:
             asset_body = assets.network_assets
         except:
-            return render_to_response('assets/assets_modf.html',{"user":request.user},   
-                                      context_instance=RequestContext(request))                                                 
-        return render_to_response('assets/assets_modf.html',{"user":request.user,"asset_type":assets.assets_type,
+            return render(request,'assets/assets_modf.html',{"user":request.user},   
+                                      )                                                 
+        return render(request,'assets/assets_modf.html',{"user":request.user,"asset_type":assets.assets_type,
                                                             "asset_main":assets,"asset_body":asset_body,
-                                                            "assets_data":getBaseAssets()},
-                            context_instance=RequestContext(request))  
+                                                            "assets_data":getBaseAssets(),'userList':userList},
+                            )  
         
 @login_required(login_url='/login')
 @permission_required('OpsManage.can_change_server_assets',login_url='/noperm/') 
@@ -268,95 +274,65 @@ def assets_import(request):
                 for i in range(1,net.nrows):
                     dataList.append(net.row_values(i))     
             except Exception,e:
-                print e
                 return []
             return dataList 
         dataList = getAssetsData(fname=filename)
         #获取服务器列表
-        for s in dataList:
+        for data in dataList:
+            assets = {
+                      'assets_type':data[0],
+                      'name':data[1],
+                      'sn':data[2],
+                      'buy_user':int(data[5]),
+                      'management_ip':data[6],
+                      'manufacturer':data[7],
+                      'model':data[8],
+                      'provider':data[9],
+                      'status':int(data[10]),
+                      'put_zone':int(data[11]),
+                      'group':int(data[12]),
+                      'business':int(data[13]),
+                      }
+            if data[3]:assets['buy_time'] = xlrd.xldate.xldate_as_datetime(data[3],0)
+            if data[4]:assets['expire_date'] = xlrd.xldate.xldate_as_datetime(data[4],0)
+            if assets.get('assets_type') in ['vmser','server']:
+                server_assets = {
+                          'ip':data[14],
+                          'keyfile':data[15],
+                          'username':data[16],
+                          'passwd':data[17],
+                          'hostname':data[18],
+                          'port':data[19],
+                          'raid':data[20],
+                          'line':data[21],
+                          } 
+            else:
+                net_assets = {
+                            'ip':data[14],
+                            'bandwidth':data[15],
+                            'port_number': data[16],
+                            'firmware':data[17],
+                            'cpu':data[18],
+                            'stone':data[19],
+                            'configure_detail': data[20]                              
+                              }                                                  
             try:
-                count = Assets.objects.filter(name=s[1]).count()
+                count = Assets.objects.filter(name=assets.get('name')).count()
                 if count == 1:
-                    assets = Assets.objects.get(name=s[1])
-                    Assets.objects.filter(name=s[1]).update(
-                                                            assets_type = s[0],
-                                                            sn = s[2],
-                                                            buy_time = xlrd.xldate.xldate_as_datetime(s[3],0),
-                                                            expire_date = xlrd.xldate.xldate_as_datetime(s[4],0),
-                                                            buy_user = s[5],
-                                                            management_ip = s[6],
-                                                            manufacturer = s[7],
-                                                            model = s[8],
-                                                            provider = s[9],
-                                                            status = s[10],
-                                                            put_zone = s[11],
-                                                            group = s[12],
-                                                            business = s[13]
-                                                            )
-                    if s[0] == 'server':
-                        Server_Assets.objects.filter(assets=assets).update(
-                                                                           ip = s[14],
-                                                                           keyfile = s[15],
-                                                                           username = s[16],
-                                                                           passwd = str(s[17]),
-                                                                           hostname = s[18],
-                                                                           port = s[19],
-                                                                           raid = s[20],
-                                                                           line = s[21],
-                                                                           )
-                    elif s[0] in ['switch','route','printer','scanner','firewall','storage','wifi']:
-                        Network_Assets.objects.filter(assets=assets).update(
-                                                                            ip = s[14],
-                                                                            bandwidth = s[15],
-                                                                            port_number = s[16],
-                                                                            firmware = s[17],
-                                                                            cpu = s[18],
-                                                                            stone = s[19],
-                                                                            configure_detail = s[20]
-                                                                            )
+                    assetsObj = Assets.objects.get(name=assets.get('name'))
+                    Assets.objects.filter(name=assets.get('name')).update(**assets)
+                    if assets.get('assets_type') in ['vmser','server']:
+                        Server_Assets.objects.filter(assets=assetsObj).update(**server_assets)
+                    elif assets.get('assets_type') in ['switch','route','printer','scanner','firewall','storage','wifi']:
+                        Network_Assets.objects.filter(assets=assetsObj).update(**net_assets)
                 else:
-                    assets = Assets.objects.create(
-                                                    assets_type = s[0],
-                                                    name = s[1],
-                                                    sn = s[2],
-                                                    buy_time = xlrd.xldate.xldate_as_datetime(s[3],0),
-                                                    expire_date = xlrd.xldate.xldate_as_datetime(s[4],0),
-                                                    buy_user = s[5],
-                                                    management_ip = s[6],
-                                                    manufacturer = s[7],
-                                                    model = s[8],
-                                                    provider = s[9],
-                                                    status = s[10],
-                                                    put_zone = s[11],
-                                                    group = s[12],
-                                                    business = s[13]
-                                                    )     
-                    if s[0] == 'server':
-                        Server_Assets.objects.create(
-                                                        assets=assets,
-                                                        ip = s[14],
-                                                        keyfile = s[15],
-                                                        username = s[16],
-                                                        passwd = str(s[17]),
-                                                        hostname = s[18],
-                                                        port = s[19],
-                                                        raid = s[20],
-                                                        line = s[21],
-                                                    )
-                    elif s[0] in ['switch','route','printer','scanner','firewall','storage','wifi']:
-                        Network_Assets.objects.create(
-                                                        assets=assets,
-                                                        ip = s[14],
-                                                        bandwidth = s[15],
-                                                        port_number = s[16],
-                                                        firmware = s[17],
-                                                        cpu = s[18],
-                                                        stone = s[19],
-                                                        configure_detail = s[20]
-                                                     )                                           
+                    assetsObj = Assets.objects.create(**assets)     
+                    if assets.get('assets_type') in ['vmser','server']:
+                        Server_Assets.objects.create(assets=assetsObj,**server_assets)
+                    elif assets.get('assets_type') in ['switch','route','printer','scanner','firewall','storage','wifi']:
+                        Network_Assets.objects.create(assets=assetsObj,**net_assets)                                           
             except Exception,e:
                 print e
-                pass
         return HttpResponseRedirect('/assets_list')
 
 
@@ -370,17 +346,17 @@ def assets_search(request):
         modelList = [  m.model for m in Assets.objects.raw('SELECT id,model from opsmanage_assets WHERE model is not null  GROUP BY model')]
         providerList = [  m.provider for m in Assets.objects.raw('SELECT id,provider from opsmanage_assets WHERE provider is not null GROUP BY provider')]
         cpuList = [  a.cpu for a in Assets.objects.raw('SELECT id,cpu from opsmanage_server_assets WHERE cpu is not null GROUP BY cpu')]
-        buyUserList = [  m.buy_user for m in Assets.objects.raw('SELECT id,buy_user from opsmanage_assets WHERE buy_user is not null GROUP BY buy_user')]
+        buyUserList = User.objects.all()
         selinuxList = [  m.selinux for m in Assets.objects.raw('SELECT id,selinux from opsmanage_server_assets WHERE selinux is not null GROUP BY selinux')]
         systemList = [  m.system for m in Assets.objects.raw('SELECT id,system from opsmanage_server_assets WHERE system is not null GROUP BY system')]    
         kernelList = [  m.kernel for m in Assets.objects.raw('SELECT id,kernel from opsmanage_server_assets WHERE kernel is not null GROUP BY kernel')]   
-        return render_to_response('assets/assets_search.html',{"user":request.user,"baseAssets":getBaseAssets(),
+        return render(request,'assets/assets_search.html',{"user":request.user,"baseAssets":getBaseAssets(),
                                                                "manufacturerList":manufacturerList,"modelList":modelList,
                                                                "providerList":providerList,"cpuList":cpuList,
                                                                "buyUserList":buyUserList,"selinuxList":selinuxList,
                                                                "systemList":systemList,'kernelList':kernelList,
                                                              },
-                                  context_instance=RequestContext(request)) 
+                                  ) 
     elif request.method == "POST":  
         AssetIntersection = list(set(request.POST.keys()).intersection(set(AssetFieldsList)))
         ServerAssetIntersection = list(set(request.POST.keys()).intersection(set(ServerAssetFieldsList)))
@@ -473,6 +449,8 @@ def assets_search(request):
             if server:a = a.assets
             if a.assets_type == "server":
                 assets_type = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">服务器</button></td>'''
+            elif a.assets_type == "vmser":
+                assets_type = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">虚拟机</button></td>'''                   
             elif a.assets_type == "switch":
                 assets_type = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">交换机</button></td>'''                                
             elif a.assets_type == "route":
@@ -487,24 +465,25 @@ def assets_search(request):
                 assets_type = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">存储设备</button></td>'''
             elif a.assets_type == "wifi":
                 assets_type = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">无线设备</button></td>''' 
-            management_ip = '''<td class="text-center">{ip}</td>'''.format(ip=a.management_ip)   
+            if a.management_ip:management_ip = '''<td class="text-center">{ip}</td>'''.format(ip=a.management_ip)   
+            else:management_ip = '''<td class="text-center">{ip}</td>'''.format(ip=a.server_assets.ip)  
             name = '''<td class="text-center">{name}</td>'''.format(name=a.name)      
             model = '''<td class="text-center">{model}</td>'''.format(model=a.model)                                        
             for s in baseAssets.get('service'):
                 if s.id == a.business:service = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">{service}</button></td>'''.format(service=s.service_name)
-#                 else:service = '''<td class="text-center"><button  type="button" class="btn btn-default disabled">未知</button></td>'''
             if a.status == 0:status = '''<td class="text-center"><button  type="button" class="btn btn-outline btn-success">已上线</button></td>'''
             elif a.status == 1:status = '''<td class="text-center"><button  type="button" class="btn btn-outline btn-primary">已下线</button></td>'''
             elif a.status == 2:status = '''<td class="text-center"><button  type="button" class="btn btn-outline btn-warning">维修中</button></td>'''
             elif a.status == 3:status = '''<td class="text-center"><button  type="button" class="btn btn-outline btn-info">已入库</button></td>'''
-            elif a.status == 4:status = '''<td class="text-center">button  type="button" class="btn btn-outline btn-default">未使用</button></td>'''
-            buy_user = '''<td class="text-center">{buy_user}</td>'''.format(buy_user=a.buy_user)
-            buy_time ='''<td class="text-center">{buy_time}</td>'''.format(buy_time=a.buy_time)
+            elif a.status == 4:status = '''<td class="text-center"><button  type="button" class="btn btn-outline btn-default">未使用</button></td>'''
+            if a.buy_time:buy_time = '''<td class="text-center">{buy_time}</td>'''.format(buy_time=a.buy_time)
+            else:buy_time = '''<td class="text-center">{buy_time}</td>'''.format(buy_time=str(a.create_date)[0:10])
+            group ='''<td class="text-center">{groupname}</td>'''.format(groupname=Group.objects.get(id=a.group).name)
             for z in baseAssets.get('zone'):
                 if z.id == a.put_zone:put_zone = '''<td class="text-center">{zone_name}</td>'''.format(zone_name=z.zone_name)
 #                 else:put_zone = '''<td class="text-center">未知</td>'''
             try:
-                if a.assets_type == "server":
+                if a.assets_type in ["server","vmser"]:
                     assets_type_div = '''
                                         <div class="btn-group">                
                                            <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
@@ -536,12 +515,97 @@ def assets_search(request):
                      <a href="/assets_mod/{id}" style="text-decoration:none;"><button  type="button" class="btn btn-default"><abbr title="修改资料"><i class="glyphicon glyphicon-edit"></button></i></abbr></a>
                      <button  type="button" class="btn btn-default" onclick="deleteAssets(this,{id})"><i class="glyphicon glyphicon-trash"></i></button>
                  </td>'''.format(id=a.id,assets_type_div=assets_type_div)
-            dataList.append([assets_type,management_ip,name,model,put_zone,buy_user,buy_time,service,status,opt])                                                                                                                                                                                          
+            dataList.append([assets_type,management_ip,name,model,put_zone,service,group,buy_time,status,opt])                                                                                                                                                                                          
         return JsonResponse({'msg':"数据查询成功","code":200,'data':dataList,'count':0})     
     
 @login_required(login_url='/login')  
-def assets_log(request):
+def assets_log(request,page):
     if request.method == "GET":
-        assetsList = Log_Assets.objects.all().order_by('-id')[0:120]
-        return render_to_response('assets/assets_log.html',{"user":request.user,"assetsList":assetsList},
-                                  context_instance=RequestContext(request))
+        allAssetsList = Log_Assets.objects.all().order_by('-id')[0:1000]
+        paginator = Paginator(allAssetsList, 25)          
+        try:
+            assetsList = paginator.page(page)
+        except PageNotAnInteger:
+            assetsList = paginator.page(1)
+        except EmptyPage:
+            assetsList = paginator.page(paginator.num_pages)        
+        return render(request,'assets/assets_log.html',{"user":request.user,"assetsList":assetsList})
+    
+    
+@login_required(login_url='/login')
+@permission_required('OpsManage.can_change_assets',login_url='/noperm/')
+def assets_batch(request):
+    if request.method == "POST":
+        fList = []
+        sList = []
+        resource = []
+        serList = []
+        if request.POST.get('model') == 'update':
+            for ast in request.POST.getlist('assetsIds[]'):
+                try:
+                    assets = Assets.objects.get(id=int(ast))
+                except Exception, ex:
+                    print ex
+                    continue
+                if assets.assets_type in ['vmser','server']:
+                    try:
+                        server_assets = Server_Assets.objects.get(assets=assets)
+
+                    except Exception, ex:
+                        fList.append(assets.management_ip)
+                        continue
+                    serList.append(server_assets.ip)
+                    if server_assets.keyfile == 1:resource.append({"hostname": server_assets.ip, "port": int(server_assets.port)})
+                    else:resource.append({"hostname": server_assets.ip, "port": server_assets.port,"username": server_assets.username, "password": server_assets.passwd})                    
+            ANS = ANSRunner(resource)
+            ANS.run_model(host_list=serList,module_name='setup',module_args="")
+            data = ANS.handle_cmdb_data(ANS.get_model_result())    
+            if data:
+                for ds in data:
+                    status = ds.get('status')
+                    if status == 0:
+                        try:
+                            Server_Assets.objects.filter(ip=ds.get('ip')).update(cpu_number=ds.get('cpu_number'),kernel=ds.get('kernel'),
+                                                                                  selinux=ds.get('selinux'),hostname=ds.get('hostname'),
+                                                                                  system=ds.get('system'),cpu=ds.get('cpu'),
+                                                                                  disk_total=ds.get('disk_total'),cpu_core=ds.get('cpu_core'),
+                                                                                  swap=ds.get('swap'),ram_total=ds.get('ram_total'),
+                                                                                  vcpu_number=ds.get('vcpu_number')
+                                                                                  )
+                            sList.append(server_assets.ip)
+                        except Exception:
+                            fList.append(server_assets.ip)
+                    else:fList.append(server_assets.ip)                                  
+            if sList:
+                return JsonResponse({'msg':"数据更新成功","code":200,'data':{"success":sList,"failed":fList}}) 
+            else:return JsonResponse({'msg':"数据更新失败","code":500,'data':{"success":sList,"failed":fList}}) 
+            
+        elif request.POST.get('model') == 'delete':
+            for ast in request.POST.getlist('assetsIds[]'):
+                try:
+                    assets = Assets.objects.get(id=int(ast))
+                except Exception, ex:
+                    print ex
+                    continue
+                if assets.assets_type in ['vmser','server']:
+                    try:
+                        server_assets = Server_Assets.objects.get(assets=assets)
+                    except Exception, ex:
+                        fList.append(assets.management_ip)
+                        assets.delete() 
+                        continue   
+                    sList.append(server_assets.ip)
+                    server_assets.delete()                    
+                else:
+                    try:
+                        net_assets = Network_Assets.objects.get(assets=assets)
+                    except Exception, ex:
+                        fList.append(assets.management_ip)
+                        assets.delete() 
+                        continue  
+                    sList.append(assets.management_ip)
+                    net_assets.delete()                    
+                assets.delete()                                    
+            return JsonResponse({'msg':"数据更新成功","code":200,'data':{"success":sList,"failed":fList}}) 
+        else:
+            return JsonResponse({'msg':"操作失败","code":500,'data':"不支持的操作"})                 

@@ -89,9 +89,18 @@
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">模块参数</label>
 												 <div class="col-sm-6">											
-													<input id="ansible_args" type="text"   class="form-control" placeholder="输入模块参数" name="ansible_agrs" value="">
+													<input id="ansible_args" type="text"   class="form-control" placeholder="输入模块参数" name="ansible_args" value="">
 												</div>
-											</div> 											
+											</div> 	
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">Debug</label>
+												 <div class="col-sm-6">										
+														<select class="form-control" name="ansible_debug">
+															<option value="off" name="ansible_model">关闭</option>	
+															<option value="on" name="ansible_model">开启</option> 	
+														</select>
+												</div>
+											</div> 																					
 											</fieldset>
 											<legend></legend>
 											<div class="form-group">
@@ -177,7 +186,7 @@ function oBtAnsibleModel() {
 		   document.getElementById("custom_model").style.display = "none";
 	   }	
 	   else if (value=="synchronize"){
-		   document.getElementById("ansible_args").value="src=/root/a dest=/tmp/ compress=yes --exclude=.git";	
+		   document.getElementById("ansible_args").value='src=/root/a dest=/tmp/ compress=yes rsync_opts="--exclude=.git --exclude=static/image"';	
 		   document.getElementById("custom_model").style.display = "none";
 	   }		   
 	   else if (value=="get_url"){
@@ -188,6 +197,10 @@ function oBtAnsibleModel() {
 		   document.getElementById("custom_model").style.display = "";  
 		   document.getElementById("ansible_args").value="";
 	   }
+	   else if(value=="ping"){
+		   document.getElementById("custom_model").style.display = "none";  
+		   document.getElementById("ansible_args").value="";
+	   }	   
 	   else {
 		   document.getElementById("ansible_args").value="";	 
 	   }
@@ -204,7 +217,7 @@ function oBtAnsibleModel() {
 			var name = form[i].name;
 			var value = form[i].value;
 			var project = name.indexOf("ansible_model");
-			if ( project==0 && value.length==0 && name!="ansible_agrs"){
+			if ( project==0 && value.length==0 && name!="ansible_args"){
 				window.wxc.xcConfirm("请注意必填项不能为空~", window.wxc.xcConfirm.typeEnum.error);
 				btnObj.removeAttr('disabled');
 				return false;

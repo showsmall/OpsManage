@@ -8,6 +8,7 @@ sys.setdefaultencoding("utf-8")
 class Assets(models.Model):
     assets_type_choices = (
                           ('server',u'服务器'),
+                          ('vmser',u'虚拟机'),
                           ('switch',u'交换机'),
                           ('route',u'路由器'),
                           ('printer',u'打印机'),
@@ -18,10 +19,10 @@ class Assets(models.Model):
                           )
     assets_type = models.CharField(choices=assets_type_choices,max_length=100,default='server',verbose_name='资产类型')
     name = models.CharField(max_length=100,verbose_name='资产编号',unique=True)
-    sn =  models.CharField(max_length=100,verbose_name='设备序列号')
+    sn =  models.CharField(max_length=100,verbose_name='设备序列号',blank=True,null=True)
     buy_time = models.DateField(blank=True,null=True,verbose_name='购买时间')
     expire_date = models.DateField(u'过保修期',null=True, blank=True)
-    buy_user = models.CharField(max_length=100,blank=True,null=True,verbose_name='购买人')
+    buy_user = models.SmallIntegerField(blank=True,null=True,verbose_name='购买人')
     management_ip = models.GenericIPAddressField(u'管理IP',blank=True,null=True)
     manufacturer = models.CharField(max_length=100,blank=True,null=True,verbose_name='制造商')
     provider = models.CharField(max_length=100,blank=True,null=True,verbose_name='供货商')
@@ -185,6 +186,8 @@ class Service_Assets(models.Model):
 
 class Zone_Assets(models.Model):  
     zone_name = models.CharField(max_length=100,unique=True) 
+    zone_contact = models.CharField(max_length=100,blank=True,null=True,verbose_name='机房联系人')
+    zone_number = models.CharField(max_length=100,blank=True,null=True,verbose_name='联系人号码')
     '''自定义权限'''
     class Meta:
         db_table = 'opsmanage_zone_assets'
@@ -414,6 +417,7 @@ class Ansible_Playbook(models.Model):
     playbook_file = models.FileField(upload_to = './upload/playbook/',verbose_name='剧本路径')
     playbook_auth_group = models.SmallIntegerField(verbose_name='授权组',blank=True,null=True)
     playbook_auth_user = models.SmallIntegerField(verbose_name='授权用户',blank=True,null=True,)
+    playbook_type = models.SmallIntegerField(verbose_name='剧本类型',blank=True,null=True,default=0)
     class Meta:
         db_table = 'opsmanage_ansible_playbook'
         permissions = (
@@ -424,6 +428,27 @@ class Ansible_Playbook(models.Model):
         )
         verbose_name = 'Ansible剧本配置表'  
         verbose_name_plural = 'Ansible剧本配置表' 
+        
+        
+class Ansible_Script(models.Model): 
+    script_name = models.CharField(max_length=50,verbose_name='脚本名称',unique=True)
+    script_uuid = models.CharField(max_length=50,verbose_name='唯一id')
+    script_server = models.TextField(max_length=200,verbose_name='目标机器',blank=True,null=True)
+    script_file = models.FileField(upload_to = './upload/script/',verbose_name='脚本路径')
+    script_service = models.SmallIntegerField(verbose_name='授权业务',blank=True,null=True)
+    script_group = models.SmallIntegerField(verbose_name='授权组',blank=True,null=True)
+    class Meta:
+        db_table = 'opsmanage_ansible_script'
+        permissions = (
+            ("can_read_ansible_script", "读取Ansible脚本权限"),
+            ("can_change_ansible_script", "更改Ansible脚本权限"),
+            ("can_add_ansible_script", "添加Ansible脚本权限"),
+            ("can_delete_ansible_script", "删除Ansible脚本权限"),              
+        )
+        verbose_name = 'Ansible脚本配置表'  
+        verbose_name_plural = 'Ansible脚本配置表'         
+
+        
 
 class Log_Ansible_Playbook(models.Model): 
     ans_id = models.IntegerField(verbose_name='id',blank=True,null=True,default=None)
@@ -463,6 +488,7 @@ class Global_Config(models.Model):
     assets = models.SmallIntegerField(verbose_name='是否开启资产操作记录',blank=True,null=True)
     server = models.SmallIntegerField(verbose_name='是否开启服务器命令记录',blank=True,null=True)
     email = models.SmallIntegerField(verbose_name='是否开启邮件通知',blank=True,null=True)
+    webssh = models.SmallIntegerField(verbose_name='是否开启WebSSH',blank=True,null=True)
     class Meta:
         db_table = 'opsmanage_global_config'
     
@@ -501,3 +527,18 @@ class Ansible_CallBack_Model_Result(models.Model):
 class Ansible_CallBack_PlayBook_Result(models.Model):
     logId = models.ForeignKey('Log_Ansible_Playbook')
     content = models.TextField(verbose_name='输出内容',blank=True,null=True)
+    
+class User_Server(models.Model):
+    server_id = models.SmallIntegerField(verbose_name='服务器资产id')
+    user_id = models.SmallIntegerField(verbose_name='用户id')
+    class Meta:
+        db_table = 'opsmanage_user_server'
+        permissions = (
+            ("can_read_user_server", "读取用户服务器表权限"),
+            ("can_change_user_server", "更改用户服务器表权限"),
+            ("can_add_user_server", "添加用户服务器表权限"),
+            ("can_delete_user_server", "删除用户服务器表权限"),              
+        )
+        unique_together = (("server_id", "user_id"))
+        verbose_name = '用户服务器表'  
+        verbose_name_plural = '用户服务器表'
