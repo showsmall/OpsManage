@@ -17,11 +17,28 @@
  * 部署平台及节点服务器：Rsync 3+
  * MySQL版本：5.1-5.6
 
+## OpsManage功能说明
+![image](https://github.com/welliamcao/OpsManage/blob/master/demo_imgs/opsmanage.png)
+
+## Docker构建OpsManage
+[传送门](https://github.com/welliamcao/OpsManage/wiki/Docker%E6%9E%84%E5%BB%BAOpsManage)
+
+## Demo地址
+[传送门](http://47.75.140.140:8896)
+```
+用户:demo 密码：demo
+只能演示部分功能，并且每隔两小时重置数据。
+```
+## QQ交流群
+![image](https://github.com/welliamcao/OpsManage/blob/master/demo_imgs/qq_group.png)
+
 ## 安装环境配置
 一、安装Python
 ```
-# yum install zlib zlib-devel readline-devel sqlite-devel bzip2-devel openssl-devel gdbm-devel libdbi-devel ncurses-libs kernel-devel libxslt-devel libffi-devel python-devel mysql-devel zlib-devel mysql-server sshpass gcc git -y
-# wget http://mirrors.sohu.com/python/2.7.12/Python-2.7.12.tgz
+# yum install zlib zlib-devel readline-devel sqlite-devel bzip2-devel openssl-devel gdbm-devel libdbi-devel ncurses-libs kernel-devel libxslt-devel libffi-devel python-devel zlib-devel  sshpass gcc git -y
+# yum install http://www.percona.com/downloads/percona-release/redhat/0.1-6/percona-release-0.1-6.noarch.rpm
+# yum install Percona-Server-server-56 install Percona-Server-devel-56
+# wget http://mirrors.sohu.com/python/2.7.12/Python-2.7.12.tgz  #CentOS 7不用安装python2.7
 # tar -xzvf Python-2.7.12.tgz
 # cd Python-2.7.12
 # ./configure
@@ -52,6 +69,7 @@
 # tar -xzvf pip-1.5.5.tar.gz
 # cd pip-1.5.5/
 # python setup.py install
+# pip install -U pip 
 ```
 
 四、安装模块
@@ -60,7 +78,7 @@
 # git clone https://github.com/welliamcao/OpsManage.git
 # cd /mnt/OpsManage/
 # pip install -r requirements.txt  #注意，如果出现错误不要跳过，请根据错误信息尝试解决
-# easy_install paramiko
+# easy_install paramiko==2.4.1
 ```
 
 五、安装Redis
@@ -78,30 +96,29 @@ daemonize yes
 loglevel warning
 logfile "/var/log/redis.log"
 bind 你的服务器ip地址
+例如： bind 127.0.0.1 192.168.88.201
 ```
 ```
 # cd ../
 # mv redis-3.2.8 /usr/local/redis
 # /usr/local/redis/src/redis-server /usr/local/redis/redis.conf
 ```
-六、配置MySQL
+六、安装MySQL
 ```
 # vim /etc/my.cnf
 [mysqld]
-default-character-set = utf8
 character_set_server = utf8
 添加以上字段
-```
-```
-# mysql -uroot -p
-mysql> create database opsmanage;
+# /etc/init.d/mysqld restart     	#centos 6
+# systemctl start mysql.service 	#centos 7
+# mysql -uroot -p  				#初始密码为空，直接回车就行
+mysql> create database opsmanage DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
 mysql> grant all privileges on opsmanage.* to root@'%' identified by 'password';
 mysql>\q
-# /etc/init.d/mysqld restart
 ```
 七、配置OpsManage
 ```
-# cd /mnt/OpsManage
+# cd /mnt/OpsManage/OpsManage
 # vim settings.py
 BROKER_URL =  redis://192.168.1.233:6379/3 #修改成自己的配置，格式是redis://[:password]@host:port/db
 REDSI_KWARGS_LPUSH = {"host":'192.168.1.233','port':6379,'db':3} #修改成自己的配置
@@ -139,12 +156,21 @@ TEMPLATE_DIRS = (
 #     os.path.join(BASE_DIR,'mysite\templates'),
     '/mnt/OpsManage/OpsManage/templates/',	#修改成自己的配置
 )
+SFTP_CONF = {
+             'port':22,
+             'username':'root',
+             'password':'welliam',
+             'timeout':30
+             }  #修改成自己的配置
 
 ```
 八、生成数据表与管理员账户
 ```
 # cd /mnt/OpsManage/
 # python manage.py makemigrations OpsManage
+# python manage.py makemigrations wiki
+# python manage.py makemigrations orders
+# python manage.py makemigrations filemanage
 # python manage.py migrate
 # python manage.py createsuperuser
 ```
@@ -164,15 +190,26 @@ TEMPLATE_DIRS = (
 # export PYTHONOPTIMIZE=1
 # vim /etc/supervisord.conf
 最后添加
-[program:celery-worker]
-command=/usr/bin/python manage.py celery worker --loglevel=info -E
+[program:celery-worker-default]
+command=/usr/bin/python manage.py celery worker --loglevel=info -E -Q default
 directory=/mnt/OpsManage
-stdout_logfile=/var/log/celery-worker.log
+stdout_logfile=/var/log/celery-worker-default.log
 autostart=true
 autorestart=true
 redirect_stderr=true
 stopsignal=QUIT
 numprocs=1
+
+[program:celery-worker-ansible]
+command=/usr/bin/python manage.py celery worker --loglevel=info -E -Q ansible
+directory=/mnt/OpsManage
+stdout_logfile=/var/log/celery-worker-ansible.log
+autostart=true
+autorestart=true
+redirect_stderr=true
+stopsignal=QUIT
+numprocs=1
+
 
 [program:celery-beat]
 command=/usr/bin/python manage.py celery beat
@@ -197,7 +234,12 @@ numprocs=1
 
 启动celery
 # /usr/local/bin/supervisord -c /etc/supervisord.conf
-# supervisorctl status
+# supervisorctl status #要检查是否都是running状态
+```
+
+十二、SQL审核
+```
+自行安装Inception与SQLadvisor，SQLadvisor可执行文件请放在OpsManage服务器/usr/bin/sqladvisor路径
 ```
 
 ## 提供帮助

@@ -1,4 +1,7 @@
 {% extends 'index.html' %}
+{% block ace-content %}
+<script type="text/javascript" src="/static/dist/js/bootstrap-notify.js"></script>
+{% endblock %}
 {% block page-content %}
 <div id="page-wrapper">
             <div class="row">
@@ -54,7 +57,7 @@
 												 	<input type="text" class="form-control"  placeholder="编号" name="asset_name" value="{{ asset_main.name|default:"" }}" class="input-xlarge"  disabled/>
 												 </div>
 											</div>
-											{% if asset_main.assets_type == "server" %}
+											{% if asset_main.assets_type != "vmser" %}
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">设备序列号</label>
 												 <div class="col-sm-6">
@@ -164,7 +167,7 @@
 <!-- 												 	<input type="text" class="form-control" name="asset_put_zone" placeholder="放置区域" value="{{ asset_main.put_zone }}" class="input-xlarge" /> -->
 													<select class="form-control" name="asset_put_zone"  >
 														{% for z in assets_data.zone %}
-															{% if z.id == asset_main.zone %}
+															{% if z.id == asset_main.put_zone %}
 																<option value="{{z.id}}" name="asset_put_zone" selected="selected" >{{z.zone_name|default:""}}</option>
 															{% else %}
 																<option value="{{z.id}}" name="asset_put_zone">{{z.zone_name|default:""}}</option>
@@ -187,14 +190,29 @@
 														{% endfor %}						   																						
 													</select>
 												 </div>
-											</div>																	
+											</div>	
+											
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">所属产品线</label>
+												 <div class="col-sm-6">
+												   <select class="form-control" name="asset_project" id="asset_project"  onchange="javascript:oBtProjectSelect();">
+														{% for s in assets_data.project %}
+															{% if s.id == asset_main.project %}
+																<option value="{{s.id}}" name="asset_project" selected="selected" >{{s.project_name|default:""}}</option>
+															{% else %}
+																<option value="{{s.id}}" name="asset_project">{{s.project_name|default:""}}</option>
+															{% endif %}										
+														{% endfor %}							   						   					
+													</select>
+												 </div>
+											</div>																											
 														
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">业务类型</label>
 												 <div class="col-sm-6">
-												   <select class="form-control" name="asset_business"  >
+												   <select class="form-control" name="asset_business"  id="asset_business">
 														{% for s in assets_data.service %}
-															{% if s.id == asset_main.business %}
+															{% if s.id == asset_main.business and s.project.id == asset_main.project %}
 																<option value="{{s.id}}" name="asset_business" selected="selected" >{{s.service_name|default:""}}</option>
 															{% else %}
 																<option value="{{s.id}}" name="asset_business">{{s.service_name|default:""}}</option>
@@ -211,14 +229,14 @@
 											<legend>服务器设备资产信息修改 - 可选信息</legend>
 					
 											<div class="form-group" >
-												 <label class="col-sm-2 control-label">主机地址</label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>主机地址</label>
 												 <div class="col-sm-6">
 												 	<input type="text" class="form-control" name="server_ip" placeholder="Ip Address" value="{{ asset_body.ip|default:"" }}" pattern="^(\d+\.\d+\.\d+\.\d+|[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(/.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+/.?))$" title="请输入IP地址或者域名"  class="input-xlarge"/>
 												 </div>
 											</div>
 
 											<div class="form-group">
-												 <label class="col-sm-2 control-label">认证方式<i class="fa fa-info-circle" data-toggle="tooltip"  title="如果选择密钥方式认证，请先在部署服务器到节点服务器做好证书认证"></i></label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>认证方式<i class="fa fa-info-circle" data-toggle="tooltip"  title="如果选择密钥方式认证，请先在部署服务器到节点服务器做好证书认证"></i></label>
 												 <div class="col-sm-6">
 												 	<select class="form-control" id='auth_type_select' onchange="javascript:oBtAuthType();" name="server_keyfile">
 												 		{% if asset_body.keyfile == 1 %}
@@ -232,7 +250,7 @@
 												 </div>
 											</div>
 												<div class="form-group">
-													 <label class="col-sm-2 control-label">账户</label>
+													 <label class="col-sm-2 control-label"><font color='red'>* </font>账户</label>
 													 <div class="col-sm-6">
 													 <input type="text" class="form-control" name="server_username" placeholder="Username"  class="input-xlarge" value="{{ asset_body.username|default:"" }}" />
 													 </div>
@@ -244,24 +262,27 @@
 											{% endif %}
 	
 												<div class="form-group">
-													 <label class="col-sm-2 control-label">密码</label>
+													 <label class="col-sm-2 control-label"><font color='red'>* </font>密码</label>
 													 <div class="col-sm-6">
 													 <input type="password" class="form-control" name="server_passwd" placeholder="Password"  class="input-xlarge" value="{{ asset_body.passwd|default:"" }}" />
 													 </div>
-												</div>																							
+												</div>	
+												<div class="form-group">
+													 <label class="col-sm-2 control-label">sudo密码</label>
+													 <div class="col-sm-6">
+													 <input type="password" class="form-control" name="server_sudo_passwd" placeholder="Password"  class="input-xlarge" value="{{ asset_body.sudo_passwd|default:"" }}" />
+													 </div>
+												</div>																																			
 												<div class="form-group">
 													 <label class="col-sm-2 control-label">主机名字</label>
 													 <div class="col-sm-6">
 													 	<input type="text" class="form-control" name="server_hostname" placeholder="Hostname"  class="input-xlarge" value="{{ asset_body.hostname|default:"" }}" />
 													 </div>
-												</div>					
-												
-						
-												
+												</div>																												
 							
 											</div>
 											<div class="form-group">
-												 <label class="col-sm-2 control-label">端口</label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>端口</label>
 												 <div class="col-sm-6">
 												 <input type="text" class="form-control" name="server_port" placeholder="Port"  class="input-xlarge" pattern="^(\d+)" value="{{ asset_body.port|default:"" }}" />
 												 </div>
@@ -368,7 +389,13 @@
 															{% endfor %}		
 													</select>					 						 	  	
 												</div>
-											</div>	 					 											
+											</div>	 
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">备注</label>
+												 <div class="col-sm-6">
+												 	<textarea type="text" class="form-control" id="asset_mark" name="asset_mark" placeholder="备注" value="" class="input-xlarge">{{ asset_main.mark|default:"" }}</textarea>
+												 </div>
+											</div>																 											
 											</div>
 											</fieldset>
 											
@@ -385,11 +412,39 @@
 											</div>
 											
 											<div class="form-group" >
-												 <label class="col-sm-2 control-label">主机地址</label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>主机地址</label>
 												 <div class="col-sm-6">
 												 	<input type="text" class="form-control" name="net_ip" placeholder="Ip Address" value="{{ asset_body.ip|default:"" }}" pattern="^(\d+\.\d+\.\d+\.\d+|[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(/.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+/.?))$" title="请输入IP地址或者域名"  class="input-xlarge"/>
 												 </div>
 											</div>				
+											
+											<div class="form-group">
+													<label class="col-sm-2 control-label">SSH账户</label>
+													 <div class="col-sm-6">
+													 <input type="text" class="form-control" name="net_username" placeholder="Username"  class="input-xlarge" value="{{ asset_body.username|default:"" }}" />
+													</div>
+											</div>											
+											
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">SSH端口</label>
+												 <div class="col-sm-6">
+												 <input type="text" class="form-control" name="net_port" placeholder="ssh port" pattern="^(\d+)" class="input-xlarge" value="{{ asset_body.port|default:"" }}" />
+												 </div>
+											</div>											
+											
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">SSH密码</label>
+												 <div class="col-sm-6">
+												 <input type="password" class="form-control" name="net_passwd" placeholder="Password"  class="input-xlarge" value="{{ asset_body.passwd|default:"" }}" />
+												 </div>
+											</div>		
+
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">EN密码</label>
+												 <div class="col-sm-6">
+												 <input type="password" class="form-control" name="net_sudo_passwd" placeholder="Password"  class="input-xlarge" value="{{ asset_body.sudo_passwd|default:"" }}" />
+												 </div>
+											</div>												
 											
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">端口数</label>
@@ -425,7 +480,13 @@
 												 <div class="col-sm-6">						
 												 	<textarea  class="form-control" rows="5" name="net_configure_detail" placeholder="配置说明"  id="configure_detail" value="{{ asset_body.configure_detail|default:"" }}"></textarea>
 												 </div>
-											</div>	
+											</div>
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">备注</label>
+												 <div class="col-sm-6">
+												 	<textarea  class="form-control" id="asset_mark" name="asset_mark" placeholder="备注" value="" class="input-xlarge">{{ asset_main.mark|default:"" }}</textarea>
+												 </div>
+											</div>													
 											</div>
 										{% endif %}
 											</fieldset>
@@ -451,13 +512,39 @@
 <script type="text/javascript">
 $(function () { $("[data-toggle='tooltip']").tooltip(); });
 
+
+function oBtProjectSelect(){
+	   $('#asset_business option:selected').empty();
+	   var dbId = $('#asset_project option:selected').val();
+	   if ( dbId.length > 0){	 
+			$.ajax({
+				dataType: "JSON",
+				url:'/api/project/'+ dbId + '/', //请求地址
+				type:"GET",  //提交类似
+				success:function(response){
+					var binlogHtml = '<select class="form-control" name="asset_business" id="asset_business" >'
+					var selectHtml = '';
+					for (var i=0; i <response["service_assets"].length; i++){
+						 selectHtml += '<option name="asset_business" value="'+ response["service_assets"][i]["id"] +'">' + response["service_assets"][i]["service_name"] + '</option>' 
+					};                        
+					binlogHtml =  binlogHtml + selectHtml + '</select>';
+					document.getElementById("asset_business").innerHTML= binlogHtml;	
+						
+				},
+			});	
+	   };
+}
+
+
+
 function addAssetsData(obj) {
 	var form = document.getElementById('addHost');
 	for (var i = 0; i < form.length; ++i) {
 		var name = form[i].name;
 		var value = form[i].value;
 		var assetStart = name.indexOf("asset_");
-		if (assetStart==0 && value.length == 0){
+		if (assetStart==0 && value.length == 0 && name !=="asset_mark"){
+			$("[name='"+ name +"']").parent().addClass("has-error");
 			window.wxc.xcConfirm("请注意必填项不能为空~", window.wxc.xcConfirm.typeEnum.error);
 			return false;
 		}
@@ -484,7 +571,15 @@ function addAssetsData(obj) {
 			window.wxc.xcConfirm("资产修改成功", window.wxc.xcConfirm.typeEnum.success);
 		},
     	error:function(response){
-    		window.wxc.xcConfirm("资产添加失败："+response.toJSONString(), window.wxc.xcConfirm.typeEnum.error);
+/*     		window.wxc.xcConfirm("资产添加失败："+response.toJSONString(), window.wxc.xcConfirm.typeEnum.error); */
+			$.notify({
+				title: "<strong>资产修改错误:</strong><br>",
+				message: response.responseText
+			},
+			{
+				type: 'danger',
+				delay: 3600000
+			});	
     	}
 	})	
 }
@@ -503,6 +598,10 @@ function oBtAuthType() {
 }	
 
 
+$(document).ready(function() {
+    var mark = $('#asset_mark').val().replace(/<br\/>/g, "\n");
+    $('#asset_mark').text(mark)
+}); 
 
 
 function getFormData (form, filler) {
@@ -514,6 +613,11 @@ function getFormData (form, filler) {
 		var value = form[i].value;
 		if (name.length == 0)
 			continue;
+		try {
+			value  = value.replace(/\n/g,'<br/>');
+		}catch (e) {
+			alert(e);
+		}
 		if (value.length == 0) {
 			if ((typeof filler != 'string') || (filler.length == 0))
 				continue;
@@ -524,7 +628,8 @@ function getFormData (form, filler) {
 		var serverStart = name.indexOf("server_");
 		var netStart = name.indexOf("net_");
 		if (assetStart==0){
-			var asz = "assets."+name.replace("asset_","")+" = '" + value + "'";
+			var asz = "assets." + name.replace("asset_","")+" = '" + value + "'"
+			
 			try {
 				eval(asz);
 			} catch (e) {

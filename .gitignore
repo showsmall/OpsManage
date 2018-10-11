@@ -1,5 +1,6 @@
 *.pyc
 *.pyo
+migrations*
 upload*
 media*
 .DS_Store
@@ -7,3 +8,7 @@ media*
 .settings
 .project
 .pydevproject
+*.log
+./logs/opsmanage.log
+.quarantine
+

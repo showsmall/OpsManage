@@ -1,4 +1,7 @@
 {% extends 'index.html' %}
+{% block ace-content %}
+<script type="text/javascript" src="/static/dist/js/bootstrap-notify.js"></script>
+{% endblock %}
 {% block page-content %}
 
 <div id="page-wrapper">
@@ -44,7 +47,7 @@
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">资产编号</label>
 												 <div class="col-sm-6">
-												 	<input type="text" class="form-control" name="asset_name" placeholder="编号" value="" class="input-xlarge"  required/>
+												 	<input type="text" class="form-control" id="asset_name" name="asset_name" placeholder="编号" value="" class="input-xlarge"  required/>
 												 </div>
 											</div>
 																						
@@ -146,15 +149,24 @@
 													</select>
 												 </div>
 											</div>																	
+
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">所属产品线</label>
+												 <div class="col-sm-6">
+												   <select class="form-control" name="asset_project"  id="asset_project" onchange="javascript:oBtProjectSelect();">
+												   		<option selected="selected" value="">请选择一个类型</option>
+															{% for p in baseAssets.project %}
+																<option value="{{p.id}}" name="asset_project">{{p.project_name}}</option>
+															{% endfor %}								   							
+													</select>
+												 </div>
+											</div>
 														
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">业务类型</label>
 												 <div class="col-sm-6">
-												   <select class="form-control" name="asset_business"  >
-												   		<option selected="selected" value="">请选择一个类型</option>
-															{% for s in baseAssets.service %}
-																<option value="{{s.id}}" name="asset_business">{{s.service_name}}</option>
-															{% endfor %}								   							
+												   <select class="form-control" name="asset_business" id="asset_business" >
+												   		<option selected="selected" value="">请选择一个类型</option>								   							
 													</select>
 												 </div>
 											</div>		
@@ -166,19 +178,19 @@
 											<legend>服务器设备资产信息录入 - 可选信息</legend>
 					
 											<div class="form-group" >
-												 <label class="col-sm-2 control-label">主机地址<i class="fa fa-info-circle" data-toggle="tooltip"  title="必填项"></i></label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>主机地址<i class="fa fa-info-circle" data-toggle="tooltip"  title="必填项"></i></label>
 												 <div class="col-sm-6">
 												 	<input type="text" class="form-control" name="server_ip" placeholder="Ip Address" value="" pattern="^(\d+\.\d+\.\d+\.\d+|[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(/.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+/.?))$" title="请输入IP地址或者域名"  class="input-xlarge"/>
 												 </div>
 											</div>
 											<div class="form-group">
-													<label class="col-sm-2 control-label">账户</label>
+													<label class="col-sm-2 control-label"><font color='red'>* </font>账户</label>
 													 <div class="col-sm-6">
 													 <input type="text" class="form-control" name="server_username" placeholder="Username"  class="input-xlarge" value="" />
 													</div>
 											</div>	
 											<div class="form-group">
-												 <label class="col-sm-2 control-label">认证方式<i class="fa fa-info-circle" data-toggle="tooltip"  title="如果选择密钥方式认证，请先在部署服务器到节点服务器做好证书认证"></i></label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>认证方式<i class="fa fa-info-circle" data-toggle="tooltip"  title="如果选择密钥方式认证，请先在部署服务器到节点服务器做好证书认证"></i></label>
 												 <div class="col-sm-6">
 												 	<select class="form-control" id='auth_type_select' onchange="javascript:oBtAuthType();" name="server_keyfile">
 												 		<option value="1" name="server_keyfile">密钥认证</option>
@@ -189,11 +201,17 @@
 											
 											<div id="auth_accout_select" style="display:none;">
 												<div class="form-group">
-													 <label class="col-sm-2 control-label">密码</label>
+													 <label class="col-sm-2 control-label"><font color='red'>* </font>密码</label>
 													 <div class="col-sm-6">
 													 <input type="password" class="form-control" name="server_passwd" placeholder="Password"  class="input-xlarge" value="" />
 													 </div>
-												</div>											
+												</div>	
+												<div class="form-group">
+													 <label class="col-sm-2 control-label">sudo密码</label>
+													 <div class="col-sm-6">
+													 <input type="password" class="form-control" name="server_sudo_passwd" placeholder="Password"  class="input-xlarge" value="" />
+													 </div>
+												</div>																							
 												<div class="form-group">
 													 <label class="col-sm-2 control-label">主机名字</label>
 													 <div class="col-sm-6">
@@ -203,7 +221,7 @@
 											</div>
 											
 											<div class="form-group">
-												<label class="col-sm-2 control-label">端口</label>
+												<label class="col-sm-2 control-label"><font color='red'>* </font>端口</label>
 												<div class="col-sm-6">
 												<input type="text" class="form-control" name="server_port" placeholder="Port"  class="input-xlarge" pattern="^(\d+)" value="" />
 												</div>
@@ -318,11 +336,39 @@
 											</div>
 											
 											<div class="form-group" >
-												 <label class="col-sm-2 control-label">主机地址</label>
+												 <label class="col-sm-2 control-label"><font color='red'>* </font>主机地址</label>
 												 <div class="col-sm-6">
 												 	<input type="text" class="form-control" name="net_ip" placeholder="Ip Address" value="" pattern="^(\d+\.\d+\.\d+\.\d+|[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(/.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+/.?))$" title="请输入IP地址或者域名"  class="input-xlarge"/>
 												 </div>
 											</div>				
+											
+											<div class="form-group">
+													<label class="col-sm-2 control-label">SSH账户</label>
+													 <div class="col-sm-6">
+													 <input type="text" class="form-control" name="net_username" placeholder="Username"  class="input-xlarge" value="" />
+													</div>
+											</div>											
+											
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">SSH端口</label>
+												 <div class="col-sm-6">
+												 <input type="text" class="form-control" name="net_port" placeholder="ssh port" pattern="^(\d+)" class="input-xlarge" value="" />
+												 </div>
+											</div>											
+											
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">SSH密码</label>
+												 <div class="col-sm-6">
+												 <input type="password" class="form-control" name="net_passwd" placeholder="Password"  class="input-xlarge" value="" />
+												 </div>
+											</div>		
+
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">EN密码</label>
+												 <div class="col-sm-6">
+												 <input type="password" class="form-control" name="net_sudo_passwd" placeholder="Password"  class="input-xlarge" value="" />
+												 </div>
+											</div>																						
 											
 											<div class="form-group">
 												 <label class="col-sm-2 control-label">端口数</label>
@@ -360,7 +406,12 @@
 												 </div>
 											</div>	
 											</div>
-										
+											<div class="form-group">
+												 <label class="col-sm-2 control-label">备注</label>
+												 <div class="col-sm-6">
+												 	<textarea type="text" class="form-control" id="asset_mark" name="asset_mark" placeholder="备注" value="" class="input-xlarge"></textarea>
+												 </div>
+											</div>										
 											</fieldset>
 											<div class="form-group">
 											<label class="col-sm-3 control-label"></label>
@@ -389,6 +440,30 @@
 
 <script type="text/javascript"> 
 	$(function () { $("[data-toggle='tooltip']").tooltip(); });
+	
+	function oBtProjectSelect(){
+		   $('#asset_business option:selected').empty();
+		   var dbId = $('#asset_project option:selected').val();
+		   if ( dbId.length > 0){	 
+				$.ajax({
+					dataType: "JSON",
+					url:'/api/project/'+ dbId + '/', //请求地址
+					type:"GET",  //提交类似
+					success:function(response){
+						var binlogHtml = '<select class="form-control" name="asset_business" id="asset_business" >'
+						var selectHtml = '';
+						for (var i=0; i <response["service_assets"].length; i++){
+							 selectHtml += '<option name="asset_business" value="'+ response["service_assets"][i]["id"] +'">' + response["service_assets"][i]["service_name"] + '</option>' 
+						};                        
+						binlogHtml =  binlogHtml + selectHtml + '</select>';
+						document.getElementById("asset_business").innerHTML= binlogHtml;	
+							
+					},
+				});	
+		   };
+	
+	}	
+	
 	function getFormData (form, filler) {
 		var assets = {};
 		var server = {};
@@ -398,6 +473,11 @@
 			var value = form[i].value;
 			if (name.length == 0)
 				continue;
+			try {
+				value  = value.replace(/\n/g,'<br/>');
+			}catch (e) {
+				alert(e);
+			}			
 			if (value.length == 0) {
 				if ((typeof filler != 'string') || (filler.length == 0))
 					continue;
@@ -443,7 +523,7 @@
 		}
 	}
 	
-	var assets = ['asset_assets_type','asset_name','asset_sn','asset_buy_time','asset_buy_user','asset_management_ip','asset_manufacturer','asset_provider','asset_model','asset_status','asset_put_zone','asset_group','asset_business'];
+	var assets = ['asset_assets_type','asset_name','asset_sn','asset_expire_date','asset_buy_time','asset_buy_user','asset_management_ip','asset_manufacturer','asset_provider','asset_model','asset_status','asset_put_zone','asset_group','asset_business','asset_project'];
 	function oBtAssetsType() {
 		   var obj = document.getElementById("assets_type_select"); 
 		   var index = obj.selectedIndex;
@@ -452,7 +532,7 @@
 			   document.getElementById("asset_net_chioce").style.display = "none";
 			   document.getElementById("asset_server_chioce").style.display = "";  
 			   document.getElementById("asset_vmserver_chioce").style.display = "";	
-			   assets = ['asset_assets_type','asset_name','asset_sn','asset_buy_time','asset_buy_user','asset_management_ip','asset_manufacturer','asset_provider','asset_model','asset_status','asset_put_zone','asset_group','asset_business'];
+			   assets = ['asset_assets_type','asset_name','asset_sn','asset_expire_date','asset_buy_time','asset_buy_user','asset_management_ip','asset_manufacturer','asset_provider','asset_model','asset_status','asset_put_zone','asset_group','asset_business','asset_project'];
 		   }
 		   else if (value=="vmser"){
 			   document.getElementById("asset_server_chioce").style.display = "";  
@@ -464,7 +544,7 @@
 			   document.getElementById("asset_net_chioce").style.display = "";
 			   document.getElementById("asset_server_chioce").style.display = "none";	
 			   document.getElementById("asset_vmserver_chioce").style.display = "";	
-			   assets = ['asset_assets_type','asset_name','asset_sn','asset_buy_time','asset_buy_user','asset_management_ip','asset_manufacturer','asset_provider','asset_model','asset_status','asset_put_zone','asset_group','asset_business'];
+			   assets = ['asset_assets_type','asset_name','asset_sn','asset_expire_date','asset_buy_time','asset_buy_user','asset_management_ip','asset_manufacturer','asset_provider','asset_model','asset_status','asset_put_zone','asset_group','asset_business','asset_project'];
 		   }
 	}
 
@@ -481,15 +561,18 @@
 	}	
 	
 	function addAssetsData(obj) {
-		console.log(assets);
 		var form = document.getElementById('addAssets');
 		for (var i = 0; i < form.length; ++i) {
 			var name = form[i].name;
 			var value = form[i].value;
 			var assetStart = name.indexOf("asset_");
 			if (assetStart==0 && value.length == 0 && assets.indexOf(name)>=0 ){
+				$("[name='"+ name +"']").parent().addClass("has-error");
 				window.wxc.xcConfirm("请注意必填项不能为空~", window.wxc.xcConfirm.typeEnum.error);
 				return false;
+			}else if (assetStart==0 && value.length > 0){
+				$("[name='"+ name +"']").parent().removeClass("has-error");
+				$("[name='"+ name +"']").parent().addClass("has-success");
 			}
 			
 		};
@@ -513,7 +596,14 @@
 				window.wxc.xcConfirm("资产添加成功", window.wxc.xcConfirm.typeEnum.success);
 			},
 	    	error:function(response){
-	    		window.wxc.xcConfirm("资产添加失败：注意资产编号不要重复或者字段类型是否正确", window.wxc.xcConfirm.typeEnum.error);
+				$.notify({
+					title: "<strong>资产添加错误:</strong><br>",
+					message: response.responseText
+				},
+				{
+					type: 'danger',
+					delay: 3600000
+				});	
 	    	}
 		})	
 	}	

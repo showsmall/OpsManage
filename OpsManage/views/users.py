@@ -6,17 +6,19 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User,Group,Permission
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Q 
+from orders.models import Order_System
 from OpsManage.views import assets
-from OpsManage.models import (Server_Assets,Project_Order,Service_Assets,
-                                Assets,User_Server,Global_Config)
+from django.http import QueryDict
+from OpsManage.models import (Server_Assets,Service_Assets,
+                                Assets,User_Server,Global_Config,
+                                Project_Assets)
 @login_required()
 @permission_required('auth.change_user',login_url='/noperm/') 
 def user_manage(request):
     if request.method == "GET":
         userList = User.objects.all()
         groupList = Group.objects.all()
-        return render(request,'users/user_manage.html',{"user":request.user,"userList":userList,"groupList":groupList},
-                                  )    
+        return render(request,'users/user_manage.html',{"user":request.user,"userList":userList,"groupList":groupList})    
         
         
 def register(request):
@@ -56,11 +58,15 @@ def user_center(request):
                     ser = Server_Assets.objects.get(id=s.server_id)
                     serverList.append(ser.assets)
         except:
-            pass        
-        orderList = Project_Order.objects.filter(Q(order_user=User.objects.get(username=request.user)) |
-                                                Q(order_audit=User.objects.get(username=request.user))).order_by("id")[0:150]       
+            config = None     
+        orderList = Order_System.objects.filter(Q(order_user=User.objects.get(username=request.user).id) | Q(order_executor=User.objects.get(username=request.user).id)).order_by("id")[0:150]  
+        for order in  orderList:
+            if order.order_executor == request.user.id:order.perm = 1
+            order.order_user = User.objects.get(id=order.order_user).username
+            order.order_executor = User.objects.get(id=order.order_executor).username
         return render(request,'users/user_center.html',{"user":request.user,"orderList":orderList,
-                                                            "serverList":serverList,"baseAssets":baseAssets,}) 
+                                                        "serverList":serverList,"baseAssets":baseAssets,
+                                                        "config":config}) 
     if request.method == "POST":
         if request.POST.get('password') == request.POST.get('c_password'):
             try:
@@ -99,11 +105,12 @@ def user(request,uid):
         for ser in serverList:
             if ser.id in userServerListId:ser.status = 1
             else:ser.status = 0
-            
+        projectList = Project_Assets.objects.all()    
         serviceList = Service_Assets.objects.all()                      
         return render(request,'users/user_info.html',{"user":request.user,"user_info":user,
                                                           "serverList":serverList,"serviceList":serviceList,
-                                                          "permList":permList,"groupList":groupList})
+                                                          "permList":permList,"groupList":groupList,
+                                                          "projectList":projectList})
             
     elif request.method == "POST":
         try:
@@ -152,7 +159,19 @@ def user(request,uid):
         except Exception,e:
             return  render(request,'users/user_info.html',{"user":request.user,"errorInfo":"用户资料修改错误：%s" % str(e)})   
             
- 
+    elif request.method == "PUT" and request.user.is_superuser:
+        data = QueryDict(request.body)
+        password = data.get('password')
+        c_password = data.get('c_password')
+        if password == c_password:
+            try:
+                user = User.objects.get(id=uid)                  
+                user.set_password(password)
+                user.save()
+                return JsonResponse({"code":200,"data":None,"msg":"密码修改成功"})
+            except Exception,e:
+                return JsonResponse({"code":500,"data":None,"msg":"密码修改失败：%s" % str(e)}) 
+        else:return JsonResponse({"code":500,"data":None,"msg":"密码不一致，密码修改失败。"})   
 
     
     

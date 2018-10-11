@@ -4,11 +4,13 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from djcelery.models  import PeriodicTask,CrontabSchedule,WorkerState,TaskState,IntervalSchedule
 from django.contrib.auth.decorators import login_required
+from celery import task
 from celery.registry import tasks as cTasks
+from celery import registry
+from celery.task.control import revoke
 from celery.five import keys, items
 from django.contrib.auth.decorators import permission_required
-from OpsManage.utils import base
-
+from OpsManage.utils.logger import logger
 
 @login_required()
 @permission_required('djcelery.change_periodictask',login_url='/noperm/')
@@ -16,8 +18,9 @@ def task_model(request):
     if request.method == "GET":
         #获取注册的任务
         regTaskList = []
-        for task in  list(keys(cTasks)):
-            if task.startswith('OpsManage.tasks.Ansible'):regTaskList.append(task)
+        for task in list(keys(cTasks)):
+            if task.startswith('OpsManage.tasks.ansible') or task.startswith('OpsManage.tasks.sched'):
+                regTaskList.append(task)
         try:
             crontabList = CrontabSchedule.objects.all().order_by("-id")
             intervalList = IntervalSchedule.objects.all().order_by("-id")
@@ -31,26 +34,8 @@ def task_model(request):
                                               "regTaskList":regTaskList})  
     elif request.method == "POST":
         op = request.POST.get('op') 
-        if op in ['addCrontab','delCrontab','addInterval',
-                  'delInterval','addTask','editTask',
-                  'delTask'] and request.user.has_perm('djcelery.change_periodictask'):
-            if op == 'addCrontab':
-                try:
-                    CrontabSchedule.objects.create(minute=request.POST.get('minute'),hour=request.POST.get('hour'),
-                                                      day_of_week=request.POST.get('day_of_week'),
-                                                      day_of_month=request.POST.get('day_of_month'),
-                                                      month_of_year=request.POST.get('month_of_year'),
-                                                      )
-                    return  JsonResponse({"code":200,"data":None,"msg":"添加成功"})
-                except:
-                    return  JsonResponse({"code":500,"data":None,"msg":"添加失败"})
-            elif op == 'delCrontab':
-                try:
-                    CrontabSchedule.objects.get(id=request.POST.get('id')).delete()
-                    return  JsonResponse({"code":200,"data":None,"msg":"删除成功"})
-                except:
-                    return  JsonResponse({"code":500,"data":None,"msg":"删除失败"})  
-            elif op == 'addInterval':
+        if op in ['addInterval','delInterval','addTask','editTask','delTask'] and request.user.has_perm('djcelery.change_periodictask'): 
+            if op == 'addInterval':
                 try:
                     IntervalSchedule.objects.create(every=request.POST.get('every'),period=request.POST.get('period'))
                     return  JsonResponse({"code":200,"data":None,"msg":"添加成功"})
@@ -107,21 +92,20 @@ def task_model(request):
 def task_view(request):  
     if request.method == "GET":          
         try:       
-            
             workList = WorkerState.objects.all()
             regTaskList = []
             for task in  list(keys(cTasks)):
-                if task.startswith('OpsManage.tasks.Ansible'):
+                if task.startswith('OpsManage.tasks.ansible') or task.startswith('OpsManage.tasks.sched'):
                     regTaskList.append(task)              
         except Exception, ex:
-            print ex
+            logger.warn(msg="获取Celery Task失败: {ex}".format(ex=str(ex)))
             taskLog = []
         return render(request,'task/task_view.html',
                       {"user":request.user,"regTaskList":regTaskList,"workList":workList},
                      )    
     elif request.method == "POST":
         op = request.POST.get('op')
-        if op in ['view','delete'] and request.user.has_perm('djcelery.change_taskstate'):
+        if op in ['view','delete','kill'] and request.user.has_perm('djcelery.change_taskstate'):
             try:
                 task = {}
                 for ds in PeriodicTask.objects.all():
@@ -145,15 +129,23 @@ def task_view(request):
                     data['state'] = taskLog.state
                     data['runtime'] = taskLog.runtime
                     return  JsonResponse({"code":200,"data":data,"msg":"操作成功"})
-                except Exception,e:
+                except Exception,ex:
+                    logger.warn(msg="查看Celery Task运行日志失败: {ex}".format(ex=str(ex)))
                     return  JsonResponse({"code":500,"data":None,"msg":"日志查看失败。"})
             elif op == 'delete':
                 try:
                     taskLog.delete()
                     return  JsonResponse({"code":200,"data":None,"msg":"删除成功"})
-                except:
-                    return  JsonResponse({"code":500,"data":None,"msg":"日志删除失败"})
-        else:return  JsonResponse({"code":500,"data":None,"msg":"不支持的操作或者您没有权限操作操作此项。"})            
+                except Exception,ex:
+                    return  JsonResponse({"code":500,"data":ex,"msg":"日志删除失败"})
+            elif op == 'kill':
+                try:
+                    revoke(taskLog.task_id, terminate=True)
+                    return  JsonResponse({"code":200,"data":None,"msg":"任务终止成功"})
+                except Exception,ex:
+                    logger.warn(msg="终止任务失败: {ex}".format(ex=str(ex)))
+                    return  JsonResponse({"code":500,"data":ex,"msg":"任务终止成功"})                
+        else:return  JsonResponse({"code":500,"data":"终止任务失败: {ex}".format(ex=str(ex)),"msg":"不支持的操作或者您没有权限操作操作此项。"})            
     else:return  JsonResponse({"code":500,"data":None,"msg":"不支持的HTTP操作"})  
     
     
@@ -186,7 +178,10 @@ def task_search(request):
                                 <div>    
                                     <a data-toggle="modal" data-target="#myViewLogModal" href="javascript:" onclick="onBtnViewTaskLog(this,{id},'{task_id}','view')">
                                         <i class="fa fa-search-plus"></i>
-                                    </a>    
+                                    </a> 
+                                    <a  href="javascript:" onclick="onBtnHandleTaskLog(this,{id},'{task_id}','kill')">
+                                        <i class="fa fa-power-off"></i>
+                                    </a>                                        
                                     <a  href="javascript:" onclick="onBtnHandleTaskLog(this,{id},'{task_id}','delete')">
                                         <i class="fa fa-trash-o"></i>
                                     </a>                                                                                
